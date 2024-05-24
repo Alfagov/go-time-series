@@ -1,7 +1,7 @@
 package timeseries
 
 import (
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -15,10 +15,10 @@ type level struct {
 	buckets     []int
 }
 
-func newLevel(clock Clock, granularity time.Duration, length int) level {
+func newLevel(clock Clock, granularity time.Duration, length int) *level {
 	level := level{clock: clock, granularity: granularity, length: length}
 	level.init()
-	return level
+	return &level
 }
 
 func (l *level) init() {
@@ -49,11 +49,12 @@ func (l *level) latest() time.Time {
 }
 
 func (l *level) increaseAtTime(amount int, time time.Time) {
+
 	difference := l.end.Sub(time.Truncate(l.granularity))
 	if difference < 0 {
 		// this cannot be negative because we advance before
 		// can at least be 0
-		log.Println("level.increaseTime was called with a time in the future")
+		slog.Error("level.increaseTime was called with a time in the future")
 	}
 	// l.length-1 because the newest element is always l.length-1 away from oldest
 	steps := (l.length - 1) - int(difference/l.granularity)

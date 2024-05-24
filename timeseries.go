@@ -2,6 +2,7 @@ package timeseries
 
 import (
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -123,10 +124,11 @@ func WithGranularities(g []Granularity) Option {
 
 type TimeSeries struct {
 	clock       Clock
-	levels      []level
+	levels      []*level
 	pending     int
 	pendingTime time.Time
 	latest      time.Time
+	sync.RWMutex
 }
 
 // NewTimeSeries creates a new time series with the provided options.
@@ -170,8 +172,8 @@ func checkGranularities(granularities []Granularity) error {
 	return nil
 }
 
-func createLevels(clock Clock, granularities []Granularity) []level {
-	levels := make([]level, len(granularities))
+func createLevels(clock Clock, granularities []Granularity) []*level {
+	levels := make([]*level, len(granularities))
 	for i := range granularities {
 		levels[i] = newLevel(clock, granularities[i].Granularity, granularities[i].Count)
 	}
@@ -185,6 +187,9 @@ func (t *TimeSeries) Increase(amount int) {
 
 // IncreaseAtTime adds amount at a specific time.
 func (t *TimeSeries) IncreaseAtTime(amount int, time time.Time) {
+	t.Lock()
+	defer t.Unlock()
+
 	if time.After(t.latest) {
 		t.latest = time
 	}
@@ -235,6 +240,9 @@ func (t *TimeSeries) handlePending() {
 
 // Recent returns the sum over [now-duration, now).
 func (t *TimeSeries) Recent(duration time.Duration) (float64, error) {
+	t.RLock()
+	defer t.RUnlock()
+
 	now := t.clock.Now()
 	return t.Range(now.Add(-duration), now)
 }
@@ -243,6 +251,9 @@ func (t *TimeSeries) Recent(duration time.Duration) (float64, error) {
 // ErrBadRange is returned if start is after end.
 // ErrRangeNotCovered is returned if the range lies outside the time series.
 func (t *TimeSeries) Range(start, end time.Time) (float64, error) {
+	t.RLock()
+	defer t.RUnlock()
+
 	if start.After(end) {
 		return 0, ErrBadRange
 	}

@@ -1,10 +1,9 @@
 package timeseries
 
 import (
+	"github.com/benbjohnson/clock"
 	"testing"
 	"time"
-
-	"github.com/benbjohnson/clock"
 )
 
 // TODO: do table based testing
